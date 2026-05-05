@@ -1,0 +1,14 @@
+<Solution>
+  <Project Path="../React/react.client/react.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="Application/Application.csproj" Id="8449dea7-34f5-41ee-99d3-f9dba8040331" />
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
+  <Project Path="Domain/Domain.csproj" />
+  <Project Path="Infrastructure/Infrastructure.csproj" Id="b168997e-7206-468a-830f-18c5da9d43b0" />
+  <Project Path="web-api-tests/Infrastructure.UnitTests.csproj" Id="a7477dc1-e3f8-4e0d-8c73-22fbbdaf7e83" />
+  <Project Path="WebAPI/WebAPI.csproj" Id="3e731143-0158-49a1-8e22-a1aacb656524" />
+</Solution>
