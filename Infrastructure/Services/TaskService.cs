@@ -200,6 +200,9 @@ public class TaskService : ITaskService
         if (parameters.IsCompleted.HasValue)
             query = query.Where(t => t.IsCompleted == parameters.IsCompleted.Value);
 
+        if (parameters.ProjectId.HasValue)
+            query = query.Where(t => t.ProjectId == parameters.ProjectId.Value);
+
         if (parameters.FromDate.HasValue)
             query = query.Where(t => t.CreatedAt >= parameters.FromDate.Value);
 

@@ -1,10 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using Application.DTOs.CreateDTOs;
-using Application.DTOs.ResponseDTOs;
+﻿using Application.DTOs.ResponseDTOs;
 using Application.DTOs.UpdateDTOs;
 using Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace WebAPI.Controllers;
 
@@ -13,88 +12,79 @@ namespace WebAPI.Controllers;
 [Authorize]
 public class UserController : ControllerBase
 {
-    private readonly IUserService userService;
+    private readonly IUserService _userService;
 
-    public UserController(IUserService _userService)
-    {
-        userService = _userService;
-    }
+    public UserController(IUserService userService) => _userService = userService;
 
-    // GET: api/user
-    [HttpGet]
+    // GET: /api/user/all
+    [Authorize(Roles = "Admin")]
+    [HttpGet("all")]
     public async Task<ActionResult<IEnumerable<ResponseUserDto>>> GetAll()
     {
-        var items = await userService.GetAllUsersAsync();
-        return Ok(items);
+        var result = await _userService.GetAllUsersAsync();
+        return Ok(result);
     }
 
-    // GET: api/user/5
-    [HttpGet("{id}")]
-    public async Task<ActionResult<ResponseUserDto>> GetById(int id)
+    // GET: /api/user/me
+    [HttpGet("me")]
+    public async Task<ActionResult<ResponseUserDto?>> GetUserById()
     {
-        var item = await userService.GetUserByIdAsync(id);
-        if (item == null)
-            return NotFound();
-        return Ok(item);
+        var userId = GetUserIdFromToken();
+        if (userId == null)
+            return Unauthorized(new { message = "ID пользователя не найден в токене" });
+
+        var result = await _userService.GetUserByIdAsync(userId.Value);
+        if (result == null)
+            return NotFound(new { message = "Пользователь не найден" });
+
+        return Ok(result);
     }
 
-    // POST: api/user
-    [HttpPost]
-    public async Task<ActionResult<ResponseUserDto>> Create(CreateUserDto createDto)
+    // DELETE: /api/user/me
+    [HttpDelete("me")]
+    public async Task<IActionResult> Delete()
     {
-        try
-        {
-            var newItem = await userService.CreateUserAsync(createDto);
-            return CreatedAtAction(nameof(GetById), new { id = newItem.Id }, newItem);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
+        var userId = GetUserIdFromToken();
+        if (userId == null)
+            return Unauthorized(new { message = "ID пользователя не найден в токене" });
 
-    // PUT: api/user/5
-    [HttpPut("{id}")]
-    public async Task<ActionResult> Update(int id, UpdateUserDto updateDto)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int currentUserId))
-            return Unauthorized();
-
-        if (userRoleClaim != "Admin" || currentUserId != id)
-            return Forbid("Нельзя редактировать других пользователей");
-
-        try
-        {
-            var updatedItem = await userService.UpdateUserAsync(id, updateDto);
-            if (updatedItem == null)
-                return NotFound();
-            return Ok(updatedItem);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    // DELETE: api/user/5
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(int id)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        var userRoleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int currentUserId))
-            return Unauthorized();
-
-        if (userRoleClaim != "Admin" || currentUserId != id)
-            return Forbid("Нельзя удалять других пользователей");
-
-        var result = await userService.DeleteUserAsync(id);
+        var result = await _userService.DeleteUserAsync(userId.Value);
         if (!result)
-            return NotFound();
+            return NotFound(new { message = "Пользователь не найден" });
 
-        return NoContent();
+        Response.Cookies.Delete("accessToken");
+        Response.Cookies.Delete("refreshToken");
+
+        return Ok(new { message = "Аккаунт успешно удалён" });
+    }
+
+    // PUT: /api/user/me
+    [HttpPut("me")]
+    public async Task<ActionResult<ResponseUserDto>> Update(UpdateUserDto updateUser)
+    {
+        var userId = GetUserIdFromToken();
+        if (userId == null)
+            return Unauthorized(new { message = "ID пользователя не найден в токене" });
+
+        try
+        {
+            var result = await _userService.UpdateUserAsync(userId.Value, updateUser);
+            if (result == null)
+                return NotFound(new { message = "Пользователь не найден" });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    private int? GetUserIdFromToken()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            return null;
+        return userId;
     }
 }

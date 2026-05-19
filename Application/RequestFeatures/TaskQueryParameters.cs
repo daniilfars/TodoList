@@ -8,7 +8,8 @@ public class TaskQueryParameters
     public bool? IsCompleted { get; set; } // фильтр по статусу выполнения
     public DateTime? FromDate { get; set; } // задачи, созданные после этой даты
     public DateTime? ToDate { get; set; } // задачи, созданные до этой даты
-    
+    public int? ProjectId { get; set; }
+
     // Сортировка
     private static readonly string[] AllowedSortFields = { "title", "createdat", "iscompleted" };
     private string? _sortBy;

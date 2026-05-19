@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+﻿using Application.Commands;
 using Application.DTOs.CreateDTOs;
 using Application.DTOs.ResponseDTOs;
 using Application.DTOs.UpdateDTOs;
 using Application.Interfaces;
+using Application.Queries;
 using Application.RequestFeatures;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace WebAPI.Controllers;
 
@@ -14,11 +17,13 @@ namespace WebAPI.Controllers;
 [Authorize]
 public class TaskController : ControllerBase
 {
+    private readonly IMediator mediator;
     private readonly ITaskService taskService;
 
-    public TaskController(ITaskService _taskService)
+    public TaskController(IMediator _mediator, ITaskService _taskService)
     {
         taskService = _taskService;
+        mediator = _mediator;
     }
 
     // GET: api/task/5
@@ -54,7 +59,8 @@ public class TaskController : ControllerBase
 
         try
         {
-            var newItem = await taskService.CreateTaskAsync(createDto);
+            //var newItem = await taskService.CreateTaskAsync(createDto);
+            var newItem = await mediator.Send(new CreateTaskCommand(createDto));
             return CreatedAtAction(nameof(GetById), new { id = newItem.Id }, newItem);
         }
         catch (InvalidOperationException ex)
@@ -117,7 +123,23 @@ public class TaskController : ControllerBase
         if (userId == null)
             return Unauthorized(new { message = "ID пользователя не найден в токене" });
 
-        var result = await taskService.GetTasksAsync(parameters, userId.Value);
+        //var result = await taskService.GetTasksAsync(parameters, userId.Value);
+        var query = new GetTasksQuery
+        {
+            UserId = userId.Value,
+            SearchTerm = parameters.SearchTerm,
+            IsCompleted = parameters.IsCompleted,
+            ProjectId = parameters.ProjectId,
+            FromDate = parameters.FromDate,
+            ToDate = parameters.ToDate,
+            SortBy = parameters.SortBy,
+            SortOrder = parameters.SortOrder,
+            PageNumber = parameters.PageNumber,
+            PageSize = parameters.PageSize
+        };
+
+        var result = await mediator.Send(query);
+
         return Ok(result);
     }
 
