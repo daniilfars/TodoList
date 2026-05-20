@@ -8,6 +8,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=TodoListCleanArch;Username=postgres;Password=password
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
       - JwtSettings__SecretKey=your-very-long-secret-key-min-32-characters
       - JwtSettings__Issuer=TodoListAPI
       - JwtSettings__Audience=TodoListAPI
@@ -17,6 +18,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    restart: on-failure
+
   db:
     image: postgres:15
     container_name: todolist_db
@@ -33,5 +38,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: todolist_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:

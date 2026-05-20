@@ -94,6 +94,13 @@ try
             };
         });
 
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+        options.Configuration = redisConnection ?? "localhost";
+        options.InstanceName = "TodoList";
+    });
+
     builder.Services.AddControllers();
 
     builder.Host.UseSerilog((ctx, lc) => lc

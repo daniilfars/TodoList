@@ -5,16 +5,20 @@ using Application.DTOs.ResponseDTOs;
 using Application.DTOs.UpdateDTOs;
 using Application.Interfaces;
 using BCrypt.Net;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace Infrastructure.Services;
 
 public class UserService : IUserService
 {
     readonly IAppDbContext db;
+    readonly IDistributedCache cache;
 
-    public UserService(IAppDbContext context)
+    public UserService(IAppDbContext context, IDistributedCache _cache)
     {
         db = context;
+        cache = _cache;
     }
     public async Task<User> CreateUserAsync(CreateUserDto createUserDto)
     {
@@ -68,10 +72,32 @@ public class UserService : IUserService
 
     public async Task<ResponseUserDto?> GetUserByIdAsync(int id)
     {
-        User? user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
+        User? user = null;
 
-        if (user == null)
-            return null;
+        var userString = await cache.GetStringAsync(id.ToString());
+        if(userString != null)
+            user = JsonSerializer.Deserialize<User>(userString);
+
+
+        if (user == null) {
+            user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
+
+            if(user != null)
+            {
+                Console.WriteLine($"{user.Name} извлечен из БД");
+                userString = JsonSerializer.Serialize(user);
+                await cache.SetStringAsync(user.Id.ToString(), userString, new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2)
+                });
+            }
+            else
+                return null;
+        }
+        else
+        {
+            Console.WriteLine($"{user.Name} извлечен из кэша");
+        }
 
         return new ResponseUserDto
         {
