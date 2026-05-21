@@ -11,6 +11,7 @@ using Serilog.Events;
 using Serilog.Formatting.Compact;
 using Serilog.Sinks.Seq;
 using System.Text;
+using System.Threading.Channels;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -59,6 +60,18 @@ try
     builder.Services.AddScoped<IProjectService, ProjectService>();
     builder.Services.AddScoped<ITaskService, TaskService>();
     builder.Services.AddScoped<ITagService, TagService>();
+
+    var taskChannel = Channel.CreateBounded<string>(new BoundedChannelOptions(500)
+    {
+        FullMode = BoundedChannelFullMode.Wait,
+        SingleReader = true,
+        SingleWriter = false
+    });
+
+    builder.Services.AddSingleton(taskChannel.Reader);
+    builder.Services.AddSingleton(taskChannel.Writer);
+
+    builder.Services.AddHostedService<TaskProccesingWorker>();
 
     builder.Services.AddHttpContextAccessor();
 

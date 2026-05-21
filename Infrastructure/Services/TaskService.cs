@@ -6,15 +6,18 @@ using Application.DTOs.ResponseDTOs;
 using Application.DTOs.UpdateDTOs;
 using Application.RequestFeatures;
 using Application.Interfaces;
+using System.Threading.Channels;
 
 namespace Infrastructure.Services;
 
 public class TaskService : ITaskService
 {
+    private readonly ChannelWriter<string> channelWriter;
     private readonly IAppDbContext db;
 
-    public TaskService(IAppDbContext context)
+    public TaskService(ChannelWriter<string> _channelWriter, IAppDbContext context)
     {
+        channelWriter = _channelWriter;
         db = context;
     }
 
@@ -48,6 +51,7 @@ public class TaskService : ITaskService
 
         await db.Tasks.AddAsync(task);
         await db.SaveChangesAsync();
+        await channelWriter.WriteAsync($"Началось добавление задачи #{task.Id}: {task.Title}");
 
         List<ResponseTagDto> tagDtos = new List<ResponseTagDto>();
 
@@ -83,6 +87,7 @@ public class TaskService : ITaskService
 
         db.Tasks.Remove(task);
         await db.SaveChangesAsync();
+        await channelWriter.WriteAsync($"Началось удаление задачи #{task.Id}: {task.Title}");
 
         return true;
     }
@@ -170,6 +175,7 @@ public class TaskService : ITaskService
         }
 
         await db.SaveChangesAsync();
+        await channelWriter.WriteAsync($"Началось обновление задачи #{task.Id}: {task.Title}");
 
         return new ResponseTaskDto
         {

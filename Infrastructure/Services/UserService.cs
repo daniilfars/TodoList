@@ -78,7 +78,6 @@ public class UserService : IUserService
         if(userString != null)
             user = JsonSerializer.Deserialize<User>(userString);
 
-
         if (user == null) {
             user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id);
 
@@ -88,7 +87,7 @@ public class UserService : IUserService
                 userString = JsonSerializer.Serialize(user);
                 await cache.SetStringAsync(user.Id.ToString(), userString, new DistributedCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2)
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
                 });
             }
             else
@@ -115,16 +114,40 @@ public class UserService : IUserService
         if (user == null)
             return null;
 
-        if (!string.IsNullOrWhiteSpace(updateUser.UserName))
-            user.Name = updateUser.UserName;
+        bool hasChanges = false;
 
-        if (!string.IsNullOrWhiteSpace(updateUser.Email))
+        if (!string.IsNullOrWhiteSpace(updateUser.UserName) && user.Name != updateUser.UserName)
+        {
+            user.Name = updateUser.UserName;
+            hasChanges = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(updateUser.Email) && user.Email != updateUser.Email)
+        {
             user.Email = updateUser.Email;
+            hasChanges = true;
+        }
 
         if (!string.IsNullOrWhiteSpace(updateUser.Password))
+        {
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(updateUser.Password);
+            hasChanges = true;
+        }
+
+        if (!hasChanges) // Если никакие данные не поменялись, то и не надо удалять кэш и обновлять бд
+        {
+            return new ResponseUserDto
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Email = user.Email,
+                CreatedAt = user.CreatedAt
+            };
+        }
 
         await db.SaveChangesAsync();
+
+        await cache.RemoveAsync(user.Id.ToString());
 
         return new ResponseUserDto
         {
